@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Quota · 63 hours, every week</title>
+  <meta name="description" content="Khitanshu's UPSC study-hour tracker: daily and weekly quota, Pomodoro, alarms and streaks.">
+  <meta name="theme-color" content="#e2672a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-phase="focus">
+
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">Q</span>
+    <div>
+      <div class="brand-name">Quota</div>
+      <div class="brand-sub" id="hello">Good morning</div>
+    </div>
+  </div>
+  <button class="rank" data-go="stats" aria-label="Your rank and XP">
+    <span class="rank-name" id="rankName">Aspirant</span>
+    <span class="xpbar"><i id="xpFill"></i></span>
+    <small id="xpText">0 XP</small>
+  </button>
+</header>
+
+<main>
+  <!-- TODAY -->
+  <section id="view-today" class="view active" aria-label="Today">
+    <div class="quote-strip">
+      <div>
+        <p id="qsText"></p>
+        <span id="qsAuthor"></span>
+      </div>
+      <button class="icon-btn" id="qsNext" aria-label="Show another quote" title="Another quote">↻</button>
+    </div>
+
+    <div class="banner" id="statusBanner" hidden></div>
+
+    <div class="card hero">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 120 120" class="ring" aria-hidden="true">
+          <circle class="ring-bg" cx="60" cy="60" r="52"/>
+          <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="ring-center">
+          <div class="big" id="todayDone">0.0</div>
+          <div class="muted">of <b id="todayTarget">9</b> h today</div>
+        </div>
+      </div>
+      <div class="hero-side">
+        <div class="stat"><span class="label">Still to go today</span><span class="value" id="todayLeft">9h 00m</span></div>
+        <div class="stat"><span class="label">Daily streak</span><span class="value" id="streakDays">0</span></div>
+        <div class="stat"><span class="label">Quota-week streak</span><span class="value" id="streakWeeks">0</span></div>
+        <button class="btn primary" data-go="focus">Start focusing →</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>This week</h2>
+        <span class="pill" id="weekPill">0 / 63h</span>
+      </div>
+      <div class="week-bars" id="weekBars"></div>
+      <p class="week-meta" id="weekMeta"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Log study time</h2></div>
+      <div class="quick">
+        <select id="logSubject" data-set="subject" aria-label="Subject"></select>
+        <div class="quick-btns">
+          <button class="btn" data-add="15">+15m</button>
+          <button class="btn" data-add="30">+30m</button>
+          <button class="btn" data-add="60">+1h</button>
+          <button class="btn" data-add="120">+2h</button>
+        </div>
+      </div>
+      <details class="custom-log">
+        <summary>Custom entry or a past day</summary>
+        <form id="customLog">
+          <label>Day <input type="date" id="clDate" required></label>
+          <label>Hours <input type="number" id="clHours" min="0" max="24" step="1" value="0"></label>
+          <label>Minutes <input type="number" id="clMins" min="0" max="59" step="5" value="30"></label>
+          <button class="btn primary" type="submit">Add</button>
+        </form>
+      </details>
+      <h3 class="sub-h">Today's sessions</h3>
+      <ul class="sessions" id="todaySessions"></ul>
+    </div>
+  </section>
+
+  <!-- FOCUS -->
+  <section id="view-focus" class="view" aria-label="Focus timer">
+    <div class="card timer-card">
+      <div class="seg" id="modeSeg" role="tablist">
+        <button data-mode="pomo" role="tab">Pomodoro</button>
+        <button data-mode="watch" role="tab">Stopwatch</button>
+        <button data-mode="count" role="tab">Timer</button>
+      </div>
+      <div class="phase" id="phaseLabel">Focus</div>
+      <div class="clock" id="clock">50:00</div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <div class="timer-opts">
+        <label>Subject <select id="timerSubject" data-set="subject"></select></label>
+        <label id="countWrap" hidden>Minutes <input type="number" data-set="countMin" id="countMin" min="1" max="600" step="1"></label>
+        <label id="countStudyWrap" class="check" hidden><input type="checkbox" data-set="countStudy" id="countStudy"> Count as study</label>
+      </div>
+      <div class="controls">
+        <button class="btn ghost" id="tLeft">Reset</button>
+        <button class="btn primary big-btn" id="tStart">Start</button>
+        <button class="btn ghost" id="tRight">Skip</button>
+      </div>
+      <p class="hint" id="timerHint"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Today's target</h2><span class="pill" id="focusPill">0 / 9h</span></div>
+      <div class="bar"><i id="focusFill"></i></div>
+      <p class="muted small" id="focusText"></p>
+    </div>
+  </section>
+
+  <!-- ALARMS -->
+  <section id="view-alarms" class="view" aria-label="Alarms">
+    <div class="card">
+      <div class="card-head"><h2>Alarms</h2></div>
+      <form id="alarmForm" class="alarm-form">
+        <input type="time" id="alTime" required aria-label="Alarm time">
+        <input type="text" id="alLabel" maxlength="60" placeholder="Label, e.g. Answer writing" aria-label="Alarm label">
+        <select id="alRepeat" aria-label="Repeat">
+          <option value="daily">Every day</option>
+          <option value="once">Once</option>
+        </select>
+        <button class="btn primary" type="submit">Add alarm</button>
+      </form>
+      <ul class="alarm-list" id="alarmList"></ul>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Evening check-in</h2></div>
+      <p class="muted small">At this time, if you haven't reached today's target, Quota rings and tells you exactly how much is left.</p>
+      <div class="row">
+        <label class="check"><input type="checkbox" data-set="nudgeEnabled" id="nudgeOn"> On</label>
+        <input type="time" data-set="nudgeTime" id="nudgeTime" aria-label="Check-in time">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Notifications</h2></div>
+      <p class="muted small" id="notifState"></p>
+      <button class="btn" id="notifBtn">Enable notifications</button>
+      <p class="hint">Alarms and timers work while Quota is open in a tab (it can be in the background). On a phone, add it to the home screen and keep it open while you study; the screen stays awake during focus sessions.</p>
+      <button class="btn ghost" id="testSound">Test sound</button>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section id="view-stats" class="view" aria-label="Stats">
+    <div class="card rank-card">
+      <div class="rank-big" id="rankBig">Aspirant</div>
+      <div class="bar"><i id="rankFill"></i></div>
+      <p class="muted small" id="rankNext"></p>
+      <p class="muted small">XP: 1 per minute studied, +120 for every day you hit the daily goal, +600 for every week you hit the quota.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Lifetime</h2></div>
+      <div class="totals" id="totals"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Badges</h2><span class="pill" id="badgeCount">0</span></div>
+      <div class="badges" id="badges"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Last 8 weeks</h2></div>
+      <div class="weeks" id="weeks"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Subjects this week</h2></div>
+      <div class="subjects" id="subjects"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Rank ladder</h2></div>
+      <ol class="ladder" id="ladder"></ol>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Recent sessions</h2></div>
+      <ul class="sessions" id="recentSessions"></ul>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view" aria-label="Settings">
+    <form class="card settings" id="settingsForm" onsubmit="return false">
+      <div class="card-head"><h2>Goals</h2></div>
+      <label>Name <input type="text" data-set="name" maxlength="30"></label>
+      <label>Daily goal (hours) <input type="number" data-set="dailyGoal" min="0.5" max="20" step="0.5"></label>
+      <label>Weekly quota (hours) <input type="number" data-set="weeklyGoal" min="1" max="140" step="0.5"></label>
+      <label class="check"><input type="checkbox" data-set="linkWeekly"> Keep weekly quota = daily goal × 7</label>
+      <label>Week starts on
+        <select data-set="weekStart" data-num="1">
+          <option value="1">Monday</option>
+          <option value="0">Sunday</option>
+        </select>
+      </label>
+      <label>Day ends at
+        <select data-set="dayCutoff" data-num="1">
+          <option value="0">Midnight</option>
+          <option value="1">1 AM</option>
+          <option value="2">2 AM</option>
+          <option value="3">3 AM</option>
+          <option value="4">4 AM</option>
+          <option value="5">5 AM</option>
+        </select>
+      </label>
+      <p class="hint">Late-night study before this hour counts towards the previous day.</p>
+
+      <div class="card-head"><h2>Pomodoro</h2></div>
+      <label>Focus (min) <input type="number" data-set="focusMin" min="5" max="180" step="5"></label>
+      <label>Short break (min) <input type="number" data-set="shortMin" min="1" max="60" step="1"></label>
+      <label>Long break (min) <input type="number" data-set="longMin" min="1" max="90" step="1"></label>
+      <label>Long break after every <input type="number" data-set="longEvery" min="2" max="8" step="1"></label>
+      <label class="check"><input type="checkbox" data-set="autoBreak"> Start breaks automatically</label>
+      <label class="check"><input type="checkbox" data-set="autoFocus"> Start next focus automatically</label>
+      <label>Alarm volume <input type="range" data-set="volume" min="0" max="1" step="0.05"></label>
+
+      <div class="card-head"><h2>Your data</h2></div>
+      <p class="hint">Everything is stored on this device only. Export a backup now and then, and use it to move to a new phone or laptop.</p>
+      <div class="row wrap">
+        <button class="btn" type="button" id="exportBtn">Export backup</button>
+        <label class="btn" for="importFile">Import backup</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="btn danger" type="button" id="resetBtn">Reset everything</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Sections">
+  <button data-tab="today" class="on">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Today</button>
+  <button data-tab="focus">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 13V9M9 3h6"/></svg>Focus</button>
+  <button data-tab="alarms">
+    <svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>Alarms</button>
+  <button data-tab="stats">
+    <svg viewBox="0 0 24 24"><path d="M5 20V12M12 20V5M19 20v-9"/></svg>Stats</button>
+  <button data-tab="settings">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Settings</button>
+</nav>
+
+<!-- Morning briefing -->
+<div class="overlay" id="briefing" hidden>
+  <div class="sheet briefing" role="dialog" aria-modal="true" aria-labelledby="bfHello">
+    <div class="bf-date" id="bfDate"></div>
+    <h2 id="bfHello">Good morning</h2>
+    <blockquote class="bf-quote"><p id="bfQuote"></p><cite id="bfAuthor"></cite></blockquote>
+    <div class="bf-report" id="bfReport"></div>
+    <button class="btn primary wide" id="bfGo">Let's go</button>
+  </div>
+</div>
+
+<!-- Ringing alarm -->
+<div class="overlay" id="ringing" hidden>
+  <div class="sheet ring-sheet" role="alertdialog" aria-modal="true" aria-labelledby="ringTitle">
+    <div class="bell" aria-hidden="true">⏰</div>
+    <h2 id="ringTitle">Alarm</h2>
+    <p id="ringBody"></p>
+    <div class="controls">
+      <button class="btn" id="ringAlt">Snooze 5 min</button>
+      <button class="btn primary" id="ringStop">Stop</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script src="quotes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
