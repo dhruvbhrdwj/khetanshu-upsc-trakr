@@ -32,14 +32,16 @@ const DEFAULTS = {
     nudgeEnabled: true,
     nudgeTime: '20:00',
     subject: 'General',
-    logMode: 'clock',
+    theme: 'system',
   },
   sessions: [],
   alarms: [
     { id: 'a1', time: '06:00', label: 'Rise. Newspaper first.', repeat: 'daily', enabled: true, lastFired: null },
   ],
   snooze: null,
-  meta: { lastBriefing: null, badges: {}, celebrated: {}, lastNudge: null },
+  // Friends: progress is published to ntfy.sh topics derived from one random name.
+  share: { on: false, topic: null, lastSent: 0 },
+  meta: { lastBriefing: null, badges: {}, celebrated: {}, lastNudge: null, alerted: {}, nudges: [] },
   timer: null,
 };
 
@@ -69,6 +71,7 @@ function load() {
         ...base, ...raw,
         settings: { ...base.settings, ...raw.settings },
         meta: { ...base.meta, ...raw.meta },
+        share: { ...base.share, ...raw.share },
       };
       s.sessions = (Array.isArray(raw.sessions) ? raw.sessions : [])
         .filter(x => x && DAY_RE.test(x.day) && Number.isFinite(x.min) && x.min > 0);
@@ -339,13 +342,22 @@ async function notify(title, body) {
 
 /* ---------- toasts & confetti ---------- */
 
-function toast(msg, kind = '') {
+function toast(msg, kind = '', action = null) {
   const el = document.createElement('div');
   el.className = `toast ${kind}`;
-  el.textContent = msg;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  el.appendChild(span);
+  if (action) {
+    const b = document.createElement('button');
+    b.textContent = action.label;
+    b.addEventListener('click', () => { action.fn(); el.remove(); });
+    el.appendChild(b);
+  }
   $('#toasts').appendChild(el);
-  setTimeout(() => el.classList.add('out'), 3200);
-  setTimeout(() => el.remove(), 3700);
+  const life = action ? 6000 : 3200;
+  setTimeout(() => el.classList.add('out'), life);
+  setTimeout(() => el.remove(), life + 500);
 }
 
 function confetti() {
@@ -370,10 +382,12 @@ function confetti() {
 
 function addSession(min, src, day = dayKey(), extra = {}) {
   min = Math.round(min);
-  if (min < 1) return;
-  state.sessions.push({ id: uid(), day, at: Date.now(), min, subject: S().subject, src, ...extra });
+  if (min < 1) return null;
+  const id = uid();
+  state.sessions.push({ id, day, at: Date.now(), min, subject: S().subject, src, ...extra });
   save();
   afterChange();
+  return id;
 }
 
 function afterChange() {
@@ -385,15 +399,18 @@ function afterChange() {
     c['d' + today] = 1;
     confetti(); chime();
     toast(`Today's target done: ${fmtHM(W.todayMin)}.`);
+    alertFriends('goal' + today, `${S().name} hit today's target`, `${fmtHM(W.todayMin)} of ${fmtHM(W.target)} done today.`, { tags: ['white_check_mark'] });
   }
   const wk = 'w' + W.days[0];
   if (W.done >= W.goalW && !c[wk]) {
     c[wk] = 1;
     confetti();
     toast(`Weekly quota complete: ${fmtGoal(W.goalW / 60)}. That's how officers are made.`);
+    alertFriends('week' + W.days[0], `${S().name} finished the weekly quota`, `${fmtH(W.done)}h this week, with ${W.daysLeft - 1} days to spare.`, { tags: ['trophy'] });
   }
   checkBadges(T);
   renderAll();
+  publishStatus();
 }
 
 function deleteSession(id) {
@@ -402,6 +419,7 @@ function deleteSession(id) {
   state.sessions = state.sessions.filter(x => x.id !== id);
   save();
   renderAll();
+  publishStatus();
 }
 
 const SRC = { manual: 'Logged', pomodoro: 'Pomodoro', stopwatch: 'Stopwatch', timer: 'Countdown' };
@@ -449,6 +467,7 @@ function renderClock() {
 
 function renderHome(T) {
   const today = dayKey();
+  renderNudges();
   const W = weekInfo(today, T);
   const goalD = W.goalD;
 
@@ -491,13 +510,15 @@ function renderHome(T) {
   $('#weekOf').textContent = `of ${fmtGoal(W.goalW / 60)}${W.from ? ' (first week, from ' + DOW[parseYmd(W.days[W.from]).getDay()] + ')' : ''}`;
   $('#weekFill').style.width = clamp(W.done / W.goalW, 0, 1) * 100 + '%';
   $('#weekFill').classList.toggle('met', W.done >= W.goalW);
+  const first = startDay();
   $('#weekStrip').innerHTML = W.days.map(d => {
     const m = T.get(d) || 0;
-    const cls = [m >= goalD ? 'met' : '', d === today ? 'today' : '', d > today ? 'future' : ''].join(' ');
-    return `<li class="${cls}" aria-label="${DOW[parseYmd(d).getDay()]}: ${d > today ? 'upcoming' : fmtHM(m)}">
+    const blank = d > today || d < first; // not yet, or before Quota was started
+    const cls = [m >= goalD ? 'met' : '', d === today ? 'today' : '', blank ? 'future' : ''].join(' ');
+    return `<li class="${cls}" aria-label="${DOW[parseYmd(d).getDay()]}: ${blank ? 'no data' : fmtHM(m)}">
       <span>${DOW[parseYmd(d).getDay()][0]}</span>
       <span class="ws-col"><i style="height:${clamp(m / goalD, 0, 1) * 100}%"></i></span>
-      <span class="ws-h">${d > today ? '–' : fmtH(m)}</span></li>`;
+      <span class="ws-h">${blank && !m ? '–' : fmtH(m)}</span></li>`;
   }).join('');
   $('#weekFacts').innerHTML = [
     ['Left this week', fmtHM(W.weekLeft)],
@@ -525,6 +546,7 @@ function renderCalendar(T, today) {
   const days = new Date(y, m + 1, 0).getDate();
   const lead = (first.getDay() - S().weekStart + 7) % 7;
   const goalD = S().dailyGoal * 60;
+  const started = startDay();
   $('#calMonth').textContent = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   $('#calNext').disabled = calMonth >= today.slice(0, 8) + '01';
 
@@ -533,7 +555,7 @@ function renderCalendar(T, today) {
   for (let d = 1; d <= days; d++) {
     const key = `${y}-${pad(m + 1)}-${pad(d)}`;
     const min = T.get(key) || 0;
-    const cls = key > today ? 'future' : min >= goalD ? 'met' : min > 0 ? 'part' : 'none';
+    const cls = key > today ? 'future' : min >= goalD ? 'met' : min > 0 ? 'part' : key < started ? 'future' : 'none';
     const label = `${shortDate(key)}: ${key > today ? 'upcoming' : fmtHM(min)}`;
     cells += `<span class="d ${cls}${key === today ? ' today' : ''}" role="listitem" title="${label}" aria-label="${label}">${d}</span>`;
   }
@@ -595,58 +617,36 @@ function renderMorning(T) {
   card.hidden = false;
 }
 
-/* ---------- log form ---------- */
+/* ---------- log form: duration only ---------- */
 
-function roundNow() {
-  const d = new Date();
-  d.setMinutes(Math.floor(d.getMinutes() / 5) * 5);
-  return hhmm(d);
-}
-
-// Continue from the last logged session only if it ended recently; otherwise leave "From" for him to fill.
-function lastClockEnd(day) {
-  const ends = state.sessions.filter(s => s.day === day && s.to).sort((a, b) => b.at - a.at);
-  if (!ends.length) return '';
-  const gap = (toMin(hhmm(new Date())) - toMin(ends[0].to) + 1440) % 1440;
-  return gap <= 4 * 60 ? ends[0].to : '';
-}
+let logDay = '0'; // '0' today, '-1' yesterday, 'other' the date field
 
 function prefillLog() {
   const today = dayKey();
-  $('#lgDay').value = today;
   $('#lgDay').max = today;
-  $('#lgFrom').value = lastClockEnd(today);
-  $('#lgTo').value = roundNow();
-  $('#lgH').value = '';
-  $('#lgM').value = '';
-  updateLogPreview();
+  $('#lgDay').value = addDays(today, -2);
+  $('#lgH').value = 0;
+  $('#lgM').value = 0;
+  setLogDay('0');
 }
 
-function setLogMode(mode) {
-  S().logMode = mode;
-  save();
-  $('#logForm').dataset.mode = mode;
-  $$('[data-logmode]').forEach(b => {
-    const on = b.dataset.logmode === mode;
+function setLogDay(choice) {
+  logDay = choice;
+  $$('[data-day]').forEach(b => {
+    const on = b.dataset.day === choice;
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', on);
   });
+  $('#lgDay').hidden = choice !== 'other';
   updateLogPreview();
 }
 
-// Reads the form; returns { min, from, to } or { error }.
+const chosenDay = () => (logDay === 'other' ? $('#lgDay').value : addDays(dayKey(), Number(logDay)));
+
 function readLog() {
-  if (S().logMode === 'clock') {
-    const from = $('#lgFrom').value, to = $('#lgTo').value;
-    if (!from || !to) return { error: 'Enter when you started and stopped.' };
-    let min = toMin(to) - toMin(from);
-    if (min <= 0) min += 24 * 60; // past midnight
-    if (min > 16 * 60) return { error: 'That is over 16 hours. Check the times.' };
-    return { min, from, to };
-  }
   const h = Number($('#lgH').value) || 0, m = Number($('#lgM').value) || 0;
-  const min = h * 60 + m;
-  if (min < 1) return { error: 'Enter hours or minutes.' };
+  const min = Math.round(h * 60 + m);
+  if (min < 1) return { error: 'Add hours or minutes first.' };
   if (min > 16 * 60) return { error: 'That is over 16 hours in one go.' };
   return { min };
 }
@@ -654,28 +654,37 @@ function readLog() {
 function updateLogPreview() {
   const r = readLog();
   $('#lgSubmit').textContent = r.error ? 'Log' : `Log ${fmtHM(r.min)}`;
+  $('#lgSubmit').disabled = !!r.error;
   $('#lgHint').textContent = '';
 }
 
-function overlaps(day, from, to) {
-  const a0 = toMin(from), a1 = a0 + ((toMin(to) - a0 + 1440) % 1440 || 1440);
-  return state.sessions.some(s => {
-    if (s.day !== day || !s.from) return false;
-    const b0 = toMin(s.from), b1 = b0 + s.min;
-    return a0 < b1 && b0 < a1;
-  });
+// The steppers: hours by 1, minutes by 5; minutes roll over into hours.
+function step(kind, delta) {
+  let h = Number($('#lgH').value) || 0, m = Number($('#lgM').value) || 0;
+  if (kind === 'h') h += delta;
+  else {
+    m = Math.round((m + delta) / 5) * 5;
+    if (m >= 60) { m -= 60; h += 1; }
+    if (m < 0) { if (h > 0) { m += 60; h -= 1; } else m = 0; }
+  }
+  h = clamp(h, 0, 16);
+  $('#lgH').value = h;
+  $('#lgM').value = clamp(m, 0, 55);
+  updateLogPreview();
 }
 
 function submitLog(e) {
   e.preventDefault();
   const r = readLog();
-  const day = $('#lgDay').value;
+  const day = chosenDay();
   if (r.error) { $('#lgHint').textContent = r.error; return; }
   if (!DAY_RE.test(day)) { $('#lgHint').textContent = 'Pick a day.'; return; }
   if (day > dayKey()) { $('#lgHint').textContent = 'You can\'t log the future. Go study it instead.'; return; }
-  if (r.from && overlaps(day, r.from, r.to) && !confirm(`${r.from} – ${r.to} overlaps a session you already logged. Log it anyway?`)) return;
-  addSession(r.min, 'manual', day, r.from ? { from: r.from, to: r.to } : {});
-  toast(`Logged ${fmtHM(r.min)}${day === dayKey() ? '' : ` on ${shortDate(day)}`}.`);
+  const id = addSession(r.min, 'manual', day);
+  toast(`Logged ${fmtHM(r.min)}${day === dayKey() ? '' : ` on ${shortDate(day)}`}`, '', {
+    label: 'Undo',
+    fn: () => { state.sessions = state.sessions.filter(x => x.id !== id); save(); renderAll(); publishStatus(); },
+  });
   prefillLog();
 }
 
@@ -747,6 +756,16 @@ function renderAlarms() {
   }[n];
   $('#notifBtn').hidden = n !== 'default';
 }
+
+function applyTheme() {
+  const t = S().theme;
+  if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--ground').trim() || '#0e0d0c';
+  chartSig = '';
+}
+matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', () => { applyTheme(); if (document.body.classList.contains('friend')) renderFriend(); else renderAll(); });
 
 function fillSettings() {
   for (const el of $$('[data-set]')) {
@@ -1012,6 +1031,9 @@ function checkAlarms(now) {
       const W = weekInfo(dayKey(now), totals());
       const left = W.target - W.todayMin;
       if (left > 0) {
+        alertFriends('behind' + dayKey(now), `${S().name} is behind today`,
+          `${fmtHM(W.todayMin)} of ${fmtHM(W.target)} done at ${S().nudgeTime}. ${fmtHM(left)} to go. Send him a nudge.`,
+          { priority: 4, tags: ['warning'], click: friendLink() });
         ring('Check-in: you\'re behind',
           `${fmtHM(W.todayMin)} done, ${fmtHM(left)} still to go today. The week doesn't forgive. Get back to the desk.`,
           { label: 'Start a Pomodoro', fn: startPomodoroNow });
@@ -1036,6 +1058,312 @@ function startPomodoroNow() {
   go('timer');
 }
 
+/* ---------- friends: accountability through ntfy.sh ----------
+   One random name (the topic) is shared through the friend link. Three ntfy topics hang off it:
+     <topic>        alerts for friends' phones (behind at the check-in, missed yesterday, goal hit)
+     <topic>-data   the latest status as JSON, read by the friend view
+     <topic>-nudge  nudges friends send back, shown in Quota
+   ntfy.sh needs no account; it keeps messages for about 12 hours. */
+
+const NTFY = 'https://ntfy.sh';
+
+function newTopic() {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return 'quota-' + [...bytes].map(b => (b % 36).toString(36)).join('');
+}
+
+const friendLink = () => state.share.topic ? `${location.origin}${location.pathname}#friend=${state.share.topic}` : '';
+
+// A JSON publish to the ntfy root; sent as text/plain so the browser needs no preflight.
+async function ntfyPublish(topic, message, opts = {}) {
+  try {
+    const res = await fetch(NTFY + '/', { method: 'POST', body: JSON.stringify({ topic, message, ...opts }) });
+    return res.ok;
+  } catch (e) { return false; }
+}
+
+async function ntfyPoll(topic, since) {
+  const res = await fetch(`${NTFY}/${topic}/json?poll=1&since=${since}`);
+  if (!res.ok) throw new Error('poll failed');
+  return (await res.text()).split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter(m => m && m.event === 'message');
+}
+
+function statusPayload() {
+  const T = totals(), today = dayKey(), W = weekInfo(today, T);
+  return {
+    v: 1, name: S().name || 'Your friend', at: Date.now(), day: today,
+    todayMin: W.todayMin, target: W.target, goalD: W.goalD,
+    weekDone: W.done, weekGoal: W.goalW, weekLeft: W.weekLeft, daysLeft: W.daysLeft, pace: W.pace, debt: W.debt,
+    streak: dayStreak(T, today), best: bestStreak(T),
+    weekDays: W.days, week: W.days.map(d => T.get(d) || 0),
+  };
+}
+
+let pubTimer = null, lastAttempt = 0;
+function publishStatus(now = false) {
+  if (!state.share.on || !state.share.topic) return;
+  if (now && Date.now() - lastAttempt < 60000) return;
+  clearTimeout(pubTimer);
+  pubTimer = setTimeout(async () => {
+    lastAttempt = Date.now();
+    if (await ntfyPublish(state.share.topic + '-data', JSON.stringify(statusPayload()))) {
+      state.share.lastSent = Date.now();
+      save();
+      renderShareStatus();
+    }
+  }, now ? 0 : 2500);
+}
+
+// One alert per key (e.g. 'behind2026-10-30'), so friends never get the same alert twice.
+function alertFriends(key, title, message, opts = {}) {
+  if (!state.share.on || !state.share.topic) return;
+  const a = state.meta.alerted;
+  if (a[key]) return;
+  a[key] = Date.now();
+  const keys = Object.keys(a);
+  if (keys.length > 80) keys.sort((x, y) => a[x] - a[y]).slice(0, keys.length - 80).forEach(k => delete a[k]);
+  save();
+  ntfyPublish(state.share.topic, message, { title, ...opts });
+}
+
+// Sent once a day when Quota is first opened: yesterday's miss, and last week's result on a new week.
+function dailyAlerts() {
+  if (!state.share.on) return;
+  const T = totals(), today = dayKey(), y = addDays(today, -1);
+  if (y < startDay()) return;
+  const goalD = S().dailyGoal * 60, yMin = T.get(y) || 0;
+  if (yMin < goalD) {
+    alertFriends('missed' + y, `${S().name} missed yesterday's goal`,
+      `${fmtHM(yMin)} of ${fmtGoal(S().dailyGoal)} on ${shortDate(y)}. Ask him what happened.`,
+      { tags: ['x'], click: friendLink() });
+  }
+  if (weekStartKey(today) === today) {
+    const W = weekInfo(y, T);
+    const hit = W.done >= W.goalW;
+    alertFriends('lastweek' + W.days[0], hit ? `${S().name} hit last week's quota` : `${S().name} missed last week's quota`,
+      `${fmtH(W.done)}h of ${fmtGoal(W.goalW / 60)} last week.`, { tags: [hit ? 'trophy' : 'x'] });
+  }
+}
+
+/* --- his side: settings and nudges --- */
+
+function renderShareStatus() {
+  const sent = state.share.lastSent;
+  $('#shareStatus').textContent = !state.share.on ? '' : sent
+    ? `Last update sent at ${hhmm(new Date(sent))}${dayKey(sent) === dayKey() ? '' : `, ${shortDate(dayKey(sent))}`}.`
+    : 'Sending the first update…';
+}
+
+function renderShare() {
+  const on = state.share.on && !!state.share.topic;
+  $('#shareOn').checked = on;
+  $('#shareBox').hidden = !on;
+  $('#friendLink').value = friendLink();
+  $('#alertTopic').textContent = state.share.topic || '';
+  renderShareStatus();
+}
+
+let nudgeES = null;
+function listenForNudges() {
+  if (nudgeES) { nudgeES.close(); nudgeES = null; }
+  if (!state.share.on || !state.share.topic) return;
+  const topic = state.share.topic + '-nudge';
+  ntfyPoll(topic, '24h').then(ms => ms.forEach(handleNudge)).catch(() => {});
+  if ('EventSource' in window) {
+    nudgeES = new EventSource(`${NTFY}/${topic}/sse`);
+    nudgeES.onmessage = e => {
+      try { const m = JSON.parse(e.data); if (m.event === 'message') handleNudge(m); } catch (err) { /* ignore */ }
+    };
+  }
+}
+
+function handleNudge(m) {
+  if (!m || !m.id || state.meta.nudges.some(n => n.id === m.id)) return;
+  let body;
+  try { body = JSON.parse(m.message); } catch (e) { body = { text: m.message }; }
+  const text = String(body.text || '').trim().slice(0, 140);
+  if (!text) return;
+  const n = { id: m.id, time: (m.time || Date.now() / 1000) * 1000, name: String(body.name || 'A friend').trim().slice(0, 24) || 'A friend', text, seen: false };
+  state.meta.nudges.unshift(n);
+  state.meta.nudges.sort((a, b) => b.time - a.time);
+  state.meta.nudges = state.meta.nudges.slice(0, 40);
+  save();
+  renderNudges();
+  toast(`${n.name}: ${n.text}`);
+  chime();
+  notify(`${n.name} nudged you`, n.text);
+}
+
+function renderNudges() {
+  const recent = state.meta.nudges.filter(n => Date.now() - n.time < 24 * 3600000);
+  $('#nudgesCard').hidden = !recent.length;
+  if (!recent.length) return;
+  $('#nudgesMeta').textContent = `${recent.length} in the last 24 hours`;
+  $('#nudgeList').innerHTML = recent.slice(0, 4).map(n => `<li class="${n.seen ? '' : 'new'}">
+      <b>${esc(n.name)}</b><span class="faint small num">${hhmm(new Date(n.time))}</span>
+      <span class="n-text">${esc(n.text)}</span></li>`).join('');
+  if (recent.some(n => !n.seen)) { recent.forEach(n => { n.seen = true; }); save(); }
+}
+
+function reportText() {
+  const T = totals(), today = dayKey(), W = weekInfo(today, T);
+  const lines = [
+    `${S().name}'s study report · ${parseYmd(today).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}`,
+    `Today: ${fmtHM(W.todayMin)} of ${fmtHM(W.target)}${W.todayMin >= W.target ? ' (done)' : ` (${fmtHM(W.target - W.todayMin)} to go)`}`,
+    `This week: ${fmtH(W.done)}h of ${fmtGoal(W.goalW / 60)}, ${W.daysLeft} day${W.daysLeft > 1 ? 's' : ''} left`,
+    `Streak: ${dayStreak(T, today)} days`,
+  ];
+  if (state.share.on) lines.push(`Live: ${friendLink()}`);
+  return lines.join('\n');
+}
+
+async function shareText(text, url) {
+  if (navigator.share) {
+    try { await navigator.share(url ? { text, url } : { text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(url ? `${text} ${url}` : text), '_blank', 'noopener');
+}
+
+$('#shareOn').addEventListener('change', e => {
+  if (e.target.checked) {
+    if (!state.share.topic) state.share.topic = newTopic();
+    state.share.on = true;
+    lastAttempt = 0;
+    publishStatus(true);
+  } else {
+    state.share.on = false;
+  }
+  save();
+  renderShare();
+  listenForNudges();
+});
+$('#shareLinkBtn').addEventListener('click', () =>
+  shareText(`Keep me honest. See my UPSC study hours and nudge me when I slack:`, friendLink()));
+$('#copyLinkBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(friendLink()); toast('Link copied.'); }
+  catch (e) { $('#friendLink').select(); toast('Select the link and copy it.'); }
+});
+$('#newLinkBtn').addEventListener('click', () => {
+  if (!confirm('Make a new link? The old link stops getting updates, so friends will need the new one.')) return;
+  state.share.topic = newTopic();
+  state.share.lastSent = 0;
+  lastAttempt = 0;
+  save();
+  publishStatus(true);
+  renderShare();
+  listenForNudges();
+  toast('New link ready. Send it to your friends.');
+});
+$('#reportBtn').addEventListener('click', () => shareText(reportText()));
+
+/* --- the friend's side: a read-only view of his progress, and nudges --- */
+
+let friendData = null;
+
+function renderFriend() {
+  const d = friendData;
+  const name = (d && d.name) || 'Your friend';
+  $('#fTitle').textContent = `${name}'s quota`;
+  document.title = `${name}'s quota`;
+  const f = $('#fFinding');
+  if (!d) {
+    $('#fUpdated').textContent = 'No update in the last 12 hours.';
+    f.innerHTML = '<span class="pill bad">Silent</span><span>Quota hasn\'t been opened for a while. Time for a nudge.</span>';
+    f.hidden = false;
+    return;
+  }
+  const mins = Math.round((Date.now() - d.at) / 60000);
+  const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.floor(mins / 60)}h ${pad(mins % 60)}m ago`;
+  $('#fUpdated').textContent = `Updated ${hhmm(new Date(d.at))}, ${ago}`;
+  const met = d.todayMin >= d.target;
+  f.hidden = false;
+  f.innerHTML = met
+    ? `<span class="pill good">Target done</span><span>${fmtHM(d.todayMin)} today. Tell him he did well.</span>`
+    : d.debt > 0
+      ? `<span class="pill bad">${fmtHM(d.debt)} behind this week</span><span>${fmtHM(d.target - d.todayMin)} still to go today.</span>`
+      : `<span class="pill good">On track</span><span>${fmtHM(d.target - d.todayMin)} still to go today.</span>`;
+
+  $('#fTodayH').textContent = d.day === dayKey() ? 'Today' : `Last active · ${shortDate(d.day)}`;
+  $('#fGoal').textContent = `Goal ${fmtGoal(d.goalD / 60)}`;
+  $('#fToday').textContent = fmtHM(d.todayMin);
+  $('#fTodayOf').textContent = met ? `of ${fmtHM(d.target)}, target done` : `of ${fmtHM(d.target)} · ${fmtHM(d.target - d.todayMin)} to go`;
+  $('#fTodayFill').style.width = clamp(d.todayMin / d.target, 0, 1) * 100 + '%';
+  $('#fTodayFill').classList.toggle('met', met);
+  $('#fTodayEnd').textContent = fmtHM(d.target);
+
+  $('#fWeek').textContent = `${fmtH(d.weekDone)}h`;
+  $('#fWeekOf').textContent = `of ${fmtGoal(d.weekGoal / 60)}`;
+  $('#fWeekFill').style.width = clamp(d.weekDone / d.weekGoal, 0, 1) * 100 + '%';
+  $('#fStreak').textContent = `${d.streak} day streak`;
+  $('#fStrip').innerHTML = (d.weekDays || []).map((day, i) => {
+    const m = d.week[i] || 0, future = day > d.day;
+    const cls = [m >= d.goalD ? 'met' : '', day === d.day ? 'today' : '', future ? 'future' : ''].join(' ');
+    const dow = DOW[parseYmd(day).getDay()];
+    return `<li class="${cls}" aria-label="${dow}: ${future ? 'upcoming' : fmtHM(m)}"><span>${dow[0]}</span>
+      <span class="ws-col"><i style="height:${clamp(m / d.goalD, 0, 1) * 100}%"></i></span>
+      <span class="ws-h">${future ? '–' : fmtH(m)}</span></li>`;
+  }).join('');
+  $('#fFacts').innerHTML = [
+    ['Left this week', fmtHM(d.weekLeft)],
+    ['Days left', `${d.daysLeft} incl. today`],
+    ['Daily pace needed', d.weekLeft ? `${fmtH(d.pace)} h/day` : '—', d.pace > d.goalD ? 'bad' : ''],
+    ['Best streak', `${d.best} days`],
+  ].map(([l, v, c]) => `<div><dt>${l}</dt><dd class="${c || ''}">${v}</dd></div>`).join('');
+}
+
+async function loadFriend(topic) {
+  try {
+    const ms = await ntfyPoll(topic + '-data', '12h');
+    for (const m of ms) {
+      try { const d = JSON.parse(m.message); if (d && d.v === 1 && (!friendData || d.at > friendData.at)) friendData = d; } catch (e) { /* skip */ }
+    }
+    renderFriend();
+  } catch (e) {
+    $('#fUpdated').textContent = 'Couldn\'t reach the update service. Check the connection and reload.';
+  }
+}
+
+function bootFriend(topic) {
+  document.body.classList.add('friend');
+  applyTheme();
+  go('friend');
+  $('#fAlerts').href = `${NTFY}/${topic}`;
+  try { $('#fName').value = localStorage.getItem('quota.friendName') || ''; } catch (e) { /* ignore */ }
+  loadFriend(topic);
+  if ('EventSource' in window) {
+    const es = new EventSource(`${NTFY}/${topic}-data/sse`);
+    es.onmessage = e => {
+      try {
+        const m = JSON.parse(e.data);
+        const d = m.event === 'message' && JSON.parse(m.message);
+        if (d && d.v === 1) { friendData = d; renderFriend(); }
+      } catch (err) { /* ignore */ }
+    };
+  }
+  setInterval(() => { if (friendData) renderFriend(); }, 30000);
+
+  $('#fChips').addEventListener('click', e => {
+    const c = e.target.closest('.chip');
+    if (!c) return;
+    $$('#fChips .chip').forEach(x => x.classList.toggle('on', x === c));
+    $('#fMsg').value = c.textContent;
+  });
+  $('#fSend').addEventListener('click', async () => {
+    const name = $('#fName').value.trim().slice(0, 24) || 'A friend';
+    const text = $('#fMsg').value.trim().slice(0, 140);
+    if (!text) { $('#fHint').textContent = 'Pick a message or write one.'; return; }
+    try { localStorage.setItem('quota.friendName', name); } catch (e) { /* ignore */ }
+    const btn = $('#fSend');
+    btn.disabled = true;
+    const ok = await ntfyPublish(topic + '-nudge', JSON.stringify({ name, text }));
+    $('#fHint').textContent = ok ? 'Sent. It pops up the next time he has Quota open.' : 'Couldn\'t send. Check the connection and try again.';
+    if (ok) { $('#fMsg').value = ''; $$('#fChips .chip').forEach(x => x.classList.remove('on')); }
+    setTimeout(() => { btn.disabled = false; }, ok ? 8000 : 1000);
+  });
+}
+
 /* ---------- events ---------- */
 
 document.addEventListener('click', e => {
@@ -1048,7 +1376,8 @@ document.addEventListener('click', e => {
     save(); return renderAlarms();
   }
   if (el.dataset.mode) return switchMode(el.dataset.mode);
-  if (el.dataset.logmode) return setLogMode(el.dataset.logmode);
+  if (el.dataset.step) { const [k, d] = el.dataset.step.split(':'); return step(k, Number(d)); }
+  if (el.dataset.day) return setLogDay(el.dataset.day);
 });
 
 $('#tStart').addEventListener('click', toggleStart);
@@ -1076,6 +1405,7 @@ $('#ringAlt').addEventListener('click', () => { stopRing(); if (ringAltFn) ringA
 
 $('#logForm').addEventListener('submit', submitLog);
 $('#logForm').addEventListener('input', e => { if (e.target.id !== 'logSubject') updateLogPreview(); });
+$$('#lgH, #lgM').forEach(i => i.addEventListener('focus', () => i.select()));
 
 $('#alarmForm').addEventListener('submit', e => {
   e.preventDefault();
@@ -1127,10 +1457,12 @@ document.addEventListener('change', e => {
     if (t.mode === 'count') t.len = S().countMin * 60000;
   }
   save();
+  if (k === 'theme') applyTheme();
   fillSettings();
   renderSubjects();
   renderAll();
   if (k === 'volume') beeps();
+  if (['name', 'dailyGoal', 'weeklyGoal', 'weekStart', 'dayCutoff', 'linkWeekly'].includes(k)) publishStatus();
 });
 
 $('#notifBtn').addEventListener('click', async () => {
@@ -1187,6 +1519,8 @@ function tick() {
   renderTimer(now);
   renderClock();
   checkAlarms(now);
+  // Keep friends' view fresh while Quota is open (ntfy.sh keeps messages for about 12 hours).
+  if (state.share.on && now - state.share.lastSent > 30 * 60000) publishStatus(true);
   const d = dayKey(now);
   if (d !== lastDay) {
     if (lastDay && !t.running) { t.cycle = 0; save(); }
@@ -1195,14 +1529,17 @@ function tick() {
     chartSig = '';
     prefillLog();
     renderAll();
+    dailyAlerts();
   }
 }
 
 function boot() {
   if (!state.meta.startDay) { state.meta.startDay = startDay(); save(); }
+  applyTheme();
   renderSubjects();
   fillSettings();
-  setLogMode(S().logMode === 'duration' ? 'duration' : 'clock');
+  renderShare();
+  listenForNudges();
   checkBadges(totals(), true);
   lastDay = null;
   calMonth = null;
@@ -1211,8 +1548,9 @@ function boot() {
   syncWakeLock();
 }
 
-boot();
-setInterval(tick, 500);
+const friendTopic = (location.hash.match(/^#friend=([a-z0-9-]{8,64})$/) || [])[1];
+if (friendTopic) bootFriend(friendTopic);
+else { boot(); setInterval(tick, 500); }
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

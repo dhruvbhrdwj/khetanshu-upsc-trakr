@@ -7,7 +7,14 @@ A no-nonsense study-hour tracker built for Khitanshu's UPSC preparation.
 ## What it does
 
 - **One clean home screen.** Today's date and a live clock; hours done today against the target; a log form; this week's total with a 7-day strip; a month calendar with the streak flame (a filled dot for each day the goal was hit); and a 14-day bar chart against the goal line.
-- **Manual logging comes first.** Read the table clock and enter *From* and *To* (e.g. 09:10 → 11:40), or switch to *Duration* to enter hours and minutes. You can pick a past day, tag a subject, delete mistakes, and you'll be warned if a session overlaps one you've already logged.
+- **Manual logging comes first, made for thumbs.** Big − / + buttons for hours and minutes (minutes go in 5s and roll over into hours), a subject, and *Today / Yesterday / Earlier*. Every log has an **Undo**.
+- **Friends keep him honest** (off until he turns it on in Settings → Friends):
+  - He sends his friends a **friend link** (WhatsApp or anywhere). It shows his live progress: today's hours against the target, the week and the streak.
+  - Friends tap **Get alerts** to be notified when he's **behind at the evening check-in**, **missed yesterday's goal**, **hit today's target**, or finished or missed the **weekly quota**.
+  - Friends can **send a nudge** ("Pick it up. The week won't wait."). It pops up on his phone with a sound and shows under *From friends* on his home screen.
+  - If he stops opening Quota, the friend page says he's gone **silent**.
+  - **Send today's report** shares a short text summary through WhatsApp, with no extra service involved.
+- **Light and dark themes**, or *Same as phone* (Settings → Appearance).
 - **Debt carries forward.** Fall short and the hours you missed are spread over the days left in the week. Today's target goes up (e.g. *9h → 9h 44m*) and a red banner says exactly how far behind you are.
 - **Daily briefing.** The first time you open the app each day, a card at the top shows a motivational quote (Kalam, Tenzing Norgay, Kipchoge, Ronaldo, Vivekananda and more), yesterday's result (or last week's on the first day of a new week) and today's target. Tap *"I'll make it up today"* to put it away.
 - **A fair first week.** The quota for the week you start is prorated to the days you've been using Quota, so day one doesn't open with 36 hours of debt.
@@ -28,6 +35,8 @@ A no-nonsense study-hour tracker built for Khitanshu's UPSC preparation.
 ## Data & privacy
 
 There's no account and no server. Everything is stored in the browser on this device (`localStorage`). Use **Settings → Export backup** now and then, and **Import backup** to move to a new device. Clearing browser data wipes it.
+
+**Friends sharing** uses [ntfy.sh](https://ntfy.sh), a free, open-source notification service that needs no account. When sharing is on, a short status goes out under a random name that only the friend link contains: today's minutes, the target, the week's totals and the streak (no subjects or notes). Anyone with the link can read it and send nudges, so share it only with friends. *Make a new link* cuts off the old one, and turning sharing off stops all updates. ntfy.sh keeps messages for about 12 hours, and updates are sent only while Quota is open, so if he doesn't open it for half a day his friends see that he's gone quiet.
 
 ## Limits
 
@@ -52,8 +61,8 @@ python3 -m http.server 8000   # then open http://localhost:8000
 | File | Purpose |
 | --- | --- |
 | `index.html` | Layout: Home, Timer (Pomodoro + alarms), Stats, Settings |
-| `app.js` | All logic: quota maths, timers, alarms, XP, badges, storage |
+| `app.js` | All logic: quota maths, logging, timers, alarms, XP, badges, storage, friends (ntfy) and the friend view |
 | `quotes.js` | The daily quote list. Add your own here. |
-| `styles.css` | Styling: a warm dark theme, with orange only on study data |
+| `styles.css` | Styling: light and dark themes, with orange only on study data |
 | `charts.js` | Small SVG chart helper (the 14-day bar chart) |
-| `sw.js`, `manifest.webmanifest`, `icon.svg` | Installable, offline-capable app |
+| `sw.js`, `manifest.webmanifest`, `icon.svg`, `icon-*.png` | Installable, offline-capable app (PNG icons for phone home screens) |

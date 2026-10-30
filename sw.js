@@ -1,6 +1,6 @@
 // Network-first service worker: always tries fresh files, falls back to cache offline.
-const CACHE = 'quota-v2';
-const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'charts.js', 'quotes.js', 'icon.svg', 'manifest.webmanifest'];
+const CACHE = 'quota-v3';
+const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'charts.js', 'quotes.js', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

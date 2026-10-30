@@ -4,15 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Quota · 63 hours, every week</title>
-  <meta name="description" content="Khitanshu's UPSC study-hour tracker: log hours, daily and weekly quota, streaks, Pomodoro and alarms.">
+  <meta name="description" content="Khitanshu's UPSC study-hour tracker: log hours, daily and weekly quota, streaks, friends who keep him honest.">
   <meta name="theme-color" content="#0e0d0c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Quota">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    // Apply the chosen theme before the first paint, so there's no flash of the wrong one.
+    try {
+      const t = (JSON.parse(localStorage.getItem('quota.v1') || '{}').settings || {}).theme;
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
 </head>
 <body data-phase="focus">
 
@@ -49,6 +60,11 @@
     </div>
     <p class="finding" id="finding" hidden></p>
 
+    <section class="panel nudges-card" id="nudgesCard" hidden aria-labelledby="nudgesH">
+      <div class="panel-head"><h2 id="nudgesH">From friends</h2><span class="muted small" id="nudgesMeta"></span></div>
+      <ul class="nudges" id="nudgeList"></ul>
+    </section>
+
     <section class="panel morning" id="morning" hidden aria-labelledby="morningH">
       <div class="panel-head"><h2 id="morningH">Today's briefing</h2></div>
       <blockquote class="quote"><p id="mQuote"></p><cite id="mAuthor"></cite></blockquote>
@@ -58,7 +74,7 @@
 
     <div class="grid">
       <section class="panel today" aria-labelledby="todayH">
-        <div class="panel-head"><h2 id="todayH">Today</h2><span class="muted" id="todayTargetLabel"></span></div>
+        <div class="panel-head"><h2 id="todayH">Today</h2><span class="muted small" id="todayTargetLabel"></span></div>
         <div class="today-figure">
           <span class="answer num" id="todayDone">0h 00m</span>
           <span class="muted" id="todayOf"></span>
@@ -69,31 +85,45 @@
         </div>
 
         <form id="logForm" class="log" novalidate>
-          <div class="log-head">
-            <h3>Log hours</h3>
-            <div class="seg" role="group" aria-label="How to log">
-              <button type="button" data-logmode="clock">Clock times</button>
-              <button type="button" data-logmode="duration">Duration</button>
+          <h3>Log hours</h3>
+          <div class="steppers">
+            <div class="stepper">
+              <span class="st-label" id="hLbl">Hours</span>
+              <div class="st-row">
+                <button type="button" class="st-btn" data-step="h:-1" aria-label="One hour less"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+                <input type="number" id="lgH" min="0" max="16" step="1" inputmode="numeric" aria-labelledby="hLbl">
+                <button type="button" class="st-btn" data-step="h:1" aria-label="One hour more"><svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
+              </div>
+            </div>
+            <div class="stepper">
+              <span class="st-label" id="mLbl">Minutes</span>
+              <div class="st-row">
+                <button type="button" class="st-btn" data-step="m:-5" aria-label="Five minutes less"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+                <input type="number" id="lgM" min="0" max="59" step="5" inputmode="numeric" aria-labelledby="mLbl">
+                <button type="button" class="st-btn" data-step="m:5" aria-label="Five minutes more"><svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
+              </div>
             </div>
           </div>
           <div class="log-fields">
-            <label class="f f-clock">From <input type="time" id="lgFrom"></label>
-            <label class="f f-clock">To <input type="time" id="lgTo"></label>
-            <label class="f f-dur">Hours <input type="number" id="lgH" min="0" max="16" step="1" inputmode="numeric"></label>
-            <label class="f f-dur">Minutes <input type="number" id="lgM" min="0" max="59" step="5" inputmode="numeric"></label>
             <label class="f">Subject <select id="logSubject" data-set="subject"></select></label>
-            <label class="f">Day <input type="date" id="lgDay"></label>
+            <div class="f">
+              <span id="dayLbl">Day</span>
+              <div class="seg day-seg" role="group" aria-labelledby="dayLbl">
+                <button type="button" data-day="0">Today</button>
+                <button type="button" data-day="-1">Yesterday</button>
+                <button type="button" data-day="other">Earlier</button>
+              </div>
+              <input type="date" id="lgDay" hidden aria-label="Pick the day">
+            </div>
           </div>
-          <div class="log-action">
-            <button class="btn primary" type="submit" id="lgSubmit">Log</button>
-            <span class="muted small" id="lgHint" aria-live="polite"></span>
-          </div>
+          <button class="btn primary wide" type="submit" id="lgSubmit">Log</button>
+          <p class="muted small log-hint" id="lgHint" aria-live="polite"></p>
         </form>
         <ul class="entries" id="todaySessions"></ul>
       </section>
 
       <section class="panel week" aria-labelledby="weekH">
-        <div class="panel-head"><h2 id="weekH">This week</h2><span class="muted num" id="weekRange"></span></div>
+        <div class="panel-head"><h2 id="weekH">This week</h2><span class="muted num small" id="weekRange"></span></div>
         <div class="week-figure"><span class="kpi num" id="weekDone">0h</span><span class="muted num" id="weekOf">of 63h</span></div>
         <div class="meter">
           <div class="track"><i id="weekFill"></i></div>
@@ -148,7 +178,7 @@
       <div class="dots" id="dots" aria-hidden="true"></div>
       <div class="timer-opts">
         <label>Subject <select id="timerSubject" data-set="subject"></select></label>
-        <label id="countWrap" hidden>Minutes <input type="number" data-set="countMin" id="countMin" min="1" max="600" step="1"></label>
+        <label id="countWrap" hidden>Minutes <input type="number" data-set="countMin" id="countMin" min="1" max="600" step="1" inputmode="numeric"></label>
         <label id="countStudyWrap" class="check" hidden><input type="checkbox" data-set="countStudy" id="countStudy"> Count as study</label>
       </div>
       <div class="controls">
@@ -225,11 +255,38 @@
   <!-- SETTINGS -->
   <section id="view-settings" class="view" aria-labelledby="setH">
     <div class="title-row"><div><h1 id="setH">Settings</h1><p class="muted">Every change saves on its own.</p></div></div>
+
+    <section class="panel settings" aria-labelledby="friendsH">
+      <div class="panel-head"><h2 id="friendsH">Friends</h2></div>
+      <p class="muted">Let friends see today's hours, the week and the streak, get an alert when you fall behind, and send you nudges.</p>
+      <label class="check big-check"><input type="checkbox" id="shareOn"> Share my progress with friends</label>
+      <div class="share-box" id="shareBox" hidden>
+        <label class="stack">Friend link <input type="text" id="friendLink" readonly></label>
+        <div class="row wrap">
+          <button class="btn primary" type="button" id="shareLinkBtn">Send link to friends</button>
+          <button class="btn" type="button" id="copyLinkBtn">Copy link</button>
+        </div>
+        <p class="muted small" id="shareStatus"></p>
+        <p class="hint">Friends who want alerts on their phone can open the link and tap "Get alerts", or install the free ntfy app and subscribe to <b id="alertTopic" class="num"></b>.</p>
+        <p class="hint">Updates travel through ntfy.sh, a free public notification service, under a random name only your link contains. Anyone with the link can see your hours and send nudges. <button class="text-btn" type="button" id="newLinkBtn">Make a new link</button> to cut off the old one.</p>
+      </div>
+      <button class="btn" type="button" id="reportBtn">Send today's report</button>
+    </section>
+
     <form class="panel settings" id="settingsForm" onsubmit="return false">
-      <div class="panel-head"><h2>Goals</h2></div>
+      <div class="panel-head"><h2>Appearance</h2></div>
+      <label>Theme
+        <select data-set="theme">
+          <option value="system">Same as phone</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+
+      <div class="panel-head sub"><h2>Goals</h2></div>
       <label>Name <input type="text" data-set="name" maxlength="30"></label>
-      <label>Daily goal (hours) <input type="number" data-set="dailyGoal" min="0.5" max="20" step="0.5"></label>
-      <label>Weekly quota (hours) <input type="number" data-set="weeklyGoal" min="1" max="140" step="0.5"></label>
+      <label>Daily goal (hours) <input type="number" data-set="dailyGoal" min="0.5" max="20" step="0.5" inputmode="decimal"></label>
+      <label>Weekly quota (hours) <input type="number" data-set="weeklyGoal" min="1" max="140" step="0.5" inputmode="decimal"></label>
       <label class="check"><input type="checkbox" data-set="linkWeekly"> Keep weekly quota at daily goal × 7</label>
       <label>Week starts on
         <select data-set="weekStart" data-num="1">
@@ -250,10 +307,10 @@
       <p class="hint">Study before this hour counts towards the previous day.</p>
 
       <div class="panel-head sub"><h2>Pomodoro</h2></div>
-      <label>Focus (min) <input type="number" data-set="focusMin" min="5" max="180" step="5"></label>
-      <label>Short break (min) <input type="number" data-set="shortMin" min="1" max="60" step="1"></label>
-      <label>Long break (min) <input type="number" data-set="longMin" min="1" max="90" step="1"></label>
-      <label>Long break after every <input type="number" data-set="longEvery" min="2" max="8" step="1"></label>
+      <label>Focus (min) <input type="number" data-set="focusMin" min="5" max="180" step="5" inputmode="numeric"></label>
+      <label>Short break (min) <input type="number" data-set="shortMin" min="1" max="60" step="1" inputmode="numeric"></label>
+      <label>Long break (min) <input type="number" data-set="longMin" min="1" max="90" step="1" inputmode="numeric"></label>
+      <label>Long break after every <input type="number" data-set="longEvery" min="2" max="8" step="1" inputmode="numeric"></label>
       <label class="check"><input type="checkbox" data-set="autoBreak"> Start breaks automatically</label>
       <label class="check"><input type="checkbox" data-set="autoFocus"> Start the next focus automatically</label>
       <label>Alarm volume <input type="range" data-set="volume" min="0" max="1" step="0.05"></label>
@@ -267,6 +324,59 @@
         <button class="btn danger" type="button" id="resetBtn">Reset everything</button>
       </div>
     </form>
+  </section>
+
+  <!-- FRIEND VIEW: what a friend sees when they open the shared link -->
+  <section id="view-friend" class="view" aria-labelledby="fTitle">
+    <div class="title-row">
+      <div>
+        <h1 id="fTitle">Your friend's quota</h1>
+        <p class="muted" id="fUpdated">Looking for the latest update…</p>
+      </div>
+    </div>
+    <p class="finding" id="fFinding" hidden></p>
+
+    <div class="grid">
+      <section class="panel today" aria-labelledby="fTodayH">
+        <div class="panel-head"><h2 id="fTodayH">Today</h2><span class="muted small" id="fGoal"></span></div>
+        <div class="today-figure">
+          <span class="answer num" id="fToday">–</span>
+          <span class="muted" id="fTodayOf"></span>
+        </div>
+        <div class="meter">
+          <div class="track"><i id="fTodayFill"></i></div>
+          <div class="ends num"><span>0h</span><span id="fTodayEnd"></span></div>
+        </div>
+
+        <div class="log nudge-box">
+          <h3>Send a nudge</h3>
+          <p class="muted small">It pops up on his phone the next time Quota is open.</p>
+          <div class="chips" id="fChips">
+            <button type="button" class="chip">Pick it up. The week won't wait.</button>
+            <button type="button" class="chip">Back to the desk.</button>
+            <button type="button" class="chip">Proud of you. Keep going.</button>
+            <button type="button" class="chip">Where are you today?</button>
+          </div>
+          <div class="log-fields">
+            <label class="f">Your name <input type="text" id="fName" maxlength="24" autocomplete="nickname"></label>
+            <label class="f">Message <input type="text" id="fMsg" maxlength="140" placeholder="Or write your own"></label>
+          </div>
+          <button class="btn primary wide" type="button" id="fSend">Send nudge</button>
+          <p class="muted small log-hint" id="fHint" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="panel week" aria-labelledby="fWeekH">
+        <div class="panel-head"><h2 id="fWeekH">This week</h2><span class="muted small" id="fStreak"></span></div>
+        <div class="week-figure"><span class="kpi num" id="fWeek">–</span><span class="muted num" id="fWeekOf"></span></div>
+        <div class="meter"><div class="track"><i id="fWeekFill"></i></div></div>
+        <ol class="week-strip" id="fStrip" aria-label="Hours per day this week"></ol>
+        <dl class="facts" id="fFacts"></dl>
+        <div class="panel-head sub"><h2>Get alerts</h2></div>
+        <p class="muted small">Get a notification when he falls behind, misses a day or hits his target.</p>
+        <div class="row wrap"><a class="btn" id="fAlerts" target="_blank" rel="noopener">Get alerts</a></div>
+      </section>
+    </div>
   </section>
 </main>
 
