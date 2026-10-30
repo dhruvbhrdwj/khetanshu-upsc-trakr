@@ -6,9 +6,11 @@ A no-nonsense study-hour tracker built for Khitanshu's UPSC preparation.
 
 ## What it does
 
-- **Daily and weekly quota.** A progress ring for today, plus a 7-day bar chart against the daily goal line.
+- **One clean home screen.** Today's date and a live clock; hours done today against the target; a log form; this week's total with a 7-day strip; a month calendar with the streak flame (a filled dot for each day the goal was hit); and a 14-day bar chart against the goal line.
+- **Manual logging comes first.** Read the table clock and enter *From* and *To* (e.g. 09:10 → 11:40), or switch to *Duration* to enter hours and minutes. You can pick a past day, tag a subject, delete mistakes, and you'll be warned if a session overlaps one you've already logged.
 - **Debt carries forward.** Fall short and the hours you missed are spread over the days left in the week. Today's target goes up (e.g. *9h → 9h 44m*) and a red banner says exactly how far behind you are.
-- **Morning briefing.** The first time you open the app each day you get a motivational quote (Kalam, Tenzing Norgay, Kipchoge, Ronaldo, Vivekananda and more), yesterday's report card, last week's result on the first day of a new week, and today's target. You have to tap *"I'll make it up today"* to get in.
+- **Daily briefing.** The first time you open the app each day, a card at the top shows a motivational quote (Kalam, Tenzing Norgay, Kipchoge, Ronaldo, Vivekananda and more), yesterday's result (or last week's on the first day of a new week) and today's target. Tap *"I'll make it up today"* to put it away.
+- **A fair first week.** The quota for the week you start is prorated to the days you've been using Quota, so day one doesn't open with 36 hours of debt.
 - **Focus timers**
   - **Pomodoro:** 50 min focus / 10 min break / 20 min long break every 3 by default. Each completed focus block is logged automatically.
   - **Stopwatch:** open-ended deep work. Press *Save* to log it.
@@ -29,7 +31,7 @@ There's no account and no server. Everything is stored in the browser on this de
 
 ## Limits
 
-Alarms and timers run while the page is open. A background tab is fine, but a fully closed browser can't ring. On a phone, add the site to the home screen and keep it open while studying. Turn on notifications in the Alarms tab so alerts reach you from other tabs.
+Alarms and timers run while the page is open. A background tab is fine, but a fully closed browser can't ring. On a phone, add the site to the home screen and keep it open while studying. Turn on notifications in the Timer tab so alerts reach you from other tabs.
 
 ## Run it
 
@@ -49,8 +51,9 @@ python3 -m http.server 8000   # then open http://localhost:8000
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | Layout: Today, Focus, Alarms, Stats, Settings |
+| `index.html` | Layout: Home, Timer (Pomodoro + alarms), Stats, Settings |
 | `app.js` | All logic: quota maths, timers, alarms, XP, badges, storage |
 | `quotes.js` | The daily quote list. Add your own here. |
-| `styles.css` | Styling (light and dark mode) |
+| `styles.css` | Styling: a warm dark theme, with orange only on study data |
+| `charts.js` | Small SVG chart helper (the 14-day bar chart) |
 | `sw.js`, `manifest.webmanifest`, `icon.svg` | Installable, offline-capable app |

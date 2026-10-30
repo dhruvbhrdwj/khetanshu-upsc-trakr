@@ -4,106 +4,147 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Quota · 63 hours, every week</title>
-  <meta name="description" content="Khitanshu's UPSC study-hour tracker: daily and weekly quota, Pomodoro, alarms and streaks.">
-  <meta name="theme-color" content="#e2672a">
+  <meta name="description" content="Khitanshu's UPSC study-hour tracker: log hours, daily and weekly quota, streaks, Pomodoro and alarms.">
+  <meta name="theme-color" content="#0e0d0c">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-phase="focus">
 
-<header class="top">
-  <div class="brand">
-    <span class="logo" aria-hidden="true">Q</span>
-    <div>
-      <div class="brand-name">Quota</div>
-      <div class="brand-sub" id="hello">Good morning</div>
-    </div>
-  </div>
-  <button class="rank" data-go="stats" aria-label="Your rank and XP">
-    <span class="rank-name" id="rankName">Aspirant</span>
-    <span class="xpbar"><i id="xpFill"></i></span>
-    <small id="xpText">0 XP</small>
+<header class="bar">
+  <button class="mark" data-tab="home" aria-label="Quota home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" class="mk-track"/><path d="M12 3a9 9 0 1 1-8.5 6" class="mk-arc"/></svg>
+    <span>Quota</span>
+  </button>
+  <nav class="nav" aria-label="Sections">
+    <button data-tab="home" class="on">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button data-tab="timer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="M12 13V9M9 3h6"/></svg>Timer</button>
+    <button data-tab="stats">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V12M12 20V5M19 20v-9"/></svg>Stats</button>
+    <button data-tab="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg>Settings</button>
+  </nav>
+  <button class="rank" data-tab="stats" aria-label="Rank and XP">
+    <span id="rankName">Aspirant</span>
+    <span class="faint num" id="xpText">0 XP</span>
   </button>
 </header>
 
 <main>
-  <!-- TODAY -->
-  <section id="view-today" class="view active" aria-label="Today">
-    <div class="quote-strip">
+  <!-- HOME -->
+  <section id="view-home" class="view active" aria-labelledby="dateTitle">
+    <div class="title-row">
       <div>
-        <p id="qsText"></p>
-        <span id="qsAuthor"></span>
+        <h1 id="dateTitle">Today</h1>
+        <p class="muted" id="hello">Good morning</p>
       </div>
-      <button class="icon-btn" id="qsNext" aria-label="Show another quote" title="Another quote">↻</button>
+      <p class="now num" aria-label="Current time"><span id="nowTime">00:00</span><span class="faint" id="nowSec">:00</span></p>
     </div>
+    <p class="finding" id="finding" hidden></p>
 
-    <div class="banner" id="statusBanner" hidden></div>
+    <section class="panel morning" id="morning" hidden aria-labelledby="morningH">
+      <div class="panel-head"><h2 id="morningH">Today's briefing</h2></div>
+      <blockquote class="quote"><p id="mQuote"></p><cite id="mAuthor"></cite></blockquote>
+      <div class="m-report" id="mReport"></div>
+      <button class="btn primary" id="mGo">Let's go</button>
+    </section>
 
-    <div class="card hero">
-      <div class="ring-wrap">
-        <svg viewBox="0 0 120 120" class="ring" aria-hidden="true">
-          <circle class="ring-bg" cx="60" cy="60" r="52"/>
-          <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52"/>
-        </svg>
-        <div class="ring-center">
-          <div class="big" id="todayDone">0.0</div>
-          <div class="muted">of <b id="todayTarget">9</b> h today</div>
+    <div class="grid">
+      <section class="panel today" aria-labelledby="todayH">
+        <div class="panel-head"><h2 id="todayH">Today</h2><span class="muted" id="todayTargetLabel"></span></div>
+        <div class="today-figure">
+          <span class="answer num" id="todayDone">0h 00m</span>
+          <span class="muted" id="todayOf"></span>
         </div>
-      </div>
-      <div class="hero-side">
-        <div class="stat"><span class="label">Still to go today</span><span class="value" id="todayLeft">9h 00m</span></div>
-        <div class="stat"><span class="label">Daily streak</span><span class="value" id="streakDays">0</span></div>
-        <div class="stat"><span class="label">Quota-week streak</span><span class="value" id="streakWeeks">0</span></div>
-        <button class="btn primary" data-go="focus">Start focusing →</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h2>This week</h2>
-        <span class="pill" id="weekPill">0 / 63h</span>
-      </div>
-      <div class="week-bars" id="weekBars"></div>
-      <p class="week-meta" id="weekMeta"></p>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Log study time</h2></div>
-      <div class="quick">
-        <select id="logSubject" data-set="subject" aria-label="Subject"></select>
-        <div class="quick-btns">
-          <button class="btn" data-add="15">+15m</button>
-          <button class="btn" data-add="30">+30m</button>
-          <button class="btn" data-add="60">+1h</button>
-          <button class="btn" data-add="120">+2h</button>
+        <div class="meter">
+          <div class="track"><i id="todayFill"></i></div>
+          <div class="ends num"><span>0h</span><span id="todayEnd">9h</span></div>
         </div>
-      </div>
-      <details class="custom-log">
-        <summary>Custom entry or a past day</summary>
-        <form id="customLog">
-          <label>Day <input type="date" id="clDate" required></label>
-          <label>Hours <input type="number" id="clHours" min="0" max="24" step="1" value="0"></label>
-          <label>Minutes <input type="number" id="clMins" min="0" max="59" step="5" value="30"></label>
-          <button class="btn primary" type="submit">Add</button>
+
+        <form id="logForm" class="log" novalidate>
+          <div class="log-head">
+            <h3>Log hours</h3>
+            <div class="seg" role="group" aria-label="How to log">
+              <button type="button" data-logmode="clock">Clock times</button>
+              <button type="button" data-logmode="duration">Duration</button>
+            </div>
+          </div>
+          <div class="log-fields">
+            <label class="f f-clock">From <input type="time" id="lgFrom"></label>
+            <label class="f f-clock">To <input type="time" id="lgTo"></label>
+            <label class="f f-dur">Hours <input type="number" id="lgH" min="0" max="16" step="1" inputmode="numeric"></label>
+            <label class="f f-dur">Minutes <input type="number" id="lgM" min="0" max="59" step="5" inputmode="numeric"></label>
+            <label class="f">Subject <select id="logSubject" data-set="subject"></select></label>
+            <label class="f">Day <input type="date" id="lgDay"></label>
+          </div>
+          <div class="log-action">
+            <button class="btn primary" type="submit" id="lgSubmit">Log</button>
+            <span class="muted small" id="lgHint" aria-live="polite"></span>
+          </div>
         </form>
-      </details>
-      <h3 class="sub-h">Today's sessions</h3>
-      <ul class="sessions" id="todaySessions"></ul>
+        <ul class="entries" id="todaySessions"></ul>
+      </section>
+
+      <section class="panel week" aria-labelledby="weekH">
+        <div class="panel-head"><h2 id="weekH">This week</h2><span class="muted num" id="weekRange"></span></div>
+        <div class="week-figure"><span class="kpi num" id="weekDone">0h</span><span class="muted num" id="weekOf">of 63h</span></div>
+        <div class="meter">
+          <div class="track"><i id="weekFill"></i></div>
+        </div>
+        <ol class="week-strip" id="weekStrip" aria-label="Hours per day this week"></ol>
+        <dl class="facts" id="weekFacts"></dl>
+      </section>
+
+      <section class="panel streak" aria-labelledby="streakH">
+        <div class="panel-head">
+          <h2 id="streakH">Streak</h2>
+          <div class="month-nav">
+            <button class="icon-btn" id="calPrev" aria-label="Previous month"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <span id="calMonth" class="num"></span>
+            <button class="icon-btn" id="calNext" aria-label="Next month"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <div class="streak-body">
+          <div class="flame-wrap">
+            <svg class="flame" viewBox="0 0 64 80" aria-hidden="true"><path d="M33 2c4 14 18 22 22 38 5 20-8 38-23 38S5 66 7 48c1-11 8-17 10-26 6 6 6 14 6 14s3-18 10-34z"/></svg>
+            <span class="flame-n num" id="streakN">0</span>
+            <span class="flame-l" id="streakL">day streak</span>
+            <span class="faint small" id="streakBest"></span>
+          </div>
+          <div class="cal" id="cal" role="list" aria-label="Study calendar"></div>
+        </div>
+        <div class="cal-key small muted">
+          <span><i class="k k-met"></i>Goal hit</span>
+          <span><i class="k k-part"></i>Some study</span>
+          <span><i class="k k-none"></i>Missed</span>
+        </div>
+      </section>
+
+      <section class="panel days" aria-labelledby="daysH">
+        <div class="panel-head"><h2 id="daysH">Past 14 days</h2><span class="muted small">Hours per day</span></div>
+        <div class="chart" id="chart14"></div>
+      </section>
     </div>
   </section>
 
-  <!-- FOCUS -->
-  <section id="view-focus" class="view" aria-label="Focus timer">
-    <div class="card timer-card">
-      <div class="seg" id="modeSeg" role="tablist">
-        <button data-mode="pomo" role="tab">Pomodoro</button>
-        <button data-mode="watch" role="tab">Stopwatch</button>
-        <button data-mode="count" role="tab">Timer</button>
+  <!-- TIMER -->
+  <section id="view-timer" class="view" aria-labelledby="timerH">
+    <div class="title-row"><div><h1 id="timerH">Timer</h1><p class="muted">Pomodoro, stopwatch and alarms</p></div></div>
+    <section class="panel timer-card" aria-label="Focus timer">
+      <div class="seg" id="modeSeg" role="group" aria-label="Timer mode">
+        <button data-mode="pomo">Pomodoro</button>
+        <button data-mode="watch">Stopwatch</button>
+        <button data-mode="count">Countdown</button>
       </div>
-      <div class="phase" id="phaseLabel">Focus</div>
-      <div class="clock" id="clock">50:00</div>
+      <p class="phase" id="phaseLabel">Focus</p>
+      <p class="clock num" id="clock">50:00</p>
       <div class="dots" id="dots" aria-hidden="true"></div>
       <div class="timer-opts">
         <label>Subject <select id="timerSubject" data-set="subject"></select></label>
@@ -111,102 +152,85 @@
         <label id="countStudyWrap" class="check" hidden><input type="checkbox" data-set="countStudy" id="countStudy"> Count as study</label>
       </div>
       <div class="controls">
-        <button class="btn ghost" id="tLeft">Reset</button>
+        <button class="btn" id="tLeft">Reset</button>
         <button class="btn primary big-btn" id="tStart">Start</button>
-        <button class="btn ghost" id="tRight">Skip</button>
+        <button class="btn" id="tRight">Skip</button>
       </div>
       <p class="hint" id="timerHint"></p>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="card-head"><h2>Today's target</h2><span class="pill" id="focusPill">0 / 9h</span></div>
-      <div class="bar"><i id="focusFill"></i></div>
-      <p class="muted small" id="focusText"></p>
-    </div>
-  </section>
+    <div class="grid two">
+      <section class="panel" aria-labelledby="alarmsH">
+        <div class="panel-head"><h2 id="alarmsH">Alarms</h2></div>
+        <form id="alarmForm" class="alarm-form">
+          <input type="time" id="alTime" required aria-label="Alarm time">
+          <input type="text" id="alLabel" maxlength="60" placeholder="Label, e.g. Answer writing" aria-label="Alarm label">
+          <select id="alRepeat" aria-label="Repeat">
+            <option value="daily">Every day</option>
+            <option value="once">Once</option>
+          </select>
+          <button class="btn primary" type="submit">Add</button>
+        </form>
+        <ul class="alarm-list" id="alarmList"></ul>
+      </section>
 
-  <!-- ALARMS -->
-  <section id="view-alarms" class="view" aria-label="Alarms">
-    <div class="card">
-      <div class="card-head"><h2>Alarms</h2></div>
-      <form id="alarmForm" class="alarm-form">
-        <input type="time" id="alTime" required aria-label="Alarm time">
-        <input type="text" id="alLabel" maxlength="60" placeholder="Label, e.g. Answer writing" aria-label="Alarm label">
-        <select id="alRepeat" aria-label="Repeat">
-          <option value="daily">Every day</option>
-          <option value="once">Once</option>
-        </select>
-        <button class="btn primary" type="submit">Add alarm</button>
-      </form>
-      <ul class="alarm-list" id="alarmList"></ul>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Evening check-in</h2></div>
-      <p class="muted small">At this time, if you haven't reached today's target, Quota rings and tells you exactly how much is left.</p>
-      <div class="row">
-        <label class="check"><input type="checkbox" data-set="nudgeEnabled" id="nudgeOn"> On</label>
-        <input type="time" data-set="nudgeTime" id="nudgeTime" aria-label="Check-in time">
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Notifications</h2></div>
-      <p class="muted small" id="notifState"></p>
-      <button class="btn" id="notifBtn">Enable notifications</button>
-      <p class="hint">Alarms and timers work while Quota is open in a tab (it can be in the background). On a phone, add it to the home screen and keep it open while you study; the screen stays awake during focus sessions.</p>
-      <button class="btn ghost" id="testSound">Test sound</button>
+      <section class="panel" aria-labelledby="checkH">
+        <div class="panel-head"><h2 id="checkH">Evening check-in</h2></div>
+        <p class="muted small">If today's target isn't met by this time, Quota rings and says how much is left.</p>
+        <div class="row">
+          <label class="check"><input type="checkbox" data-set="nudgeEnabled" id="nudgeOn"> On</label>
+          <input type="time" data-set="nudgeTime" id="nudgeTime" aria-label="Check-in time">
+        </div>
+        <div class="panel-head sub"><h2>Notifications</h2></div>
+        <p class="muted small" id="notifState"></p>
+        <div class="row wrap">
+          <button class="btn" id="notifBtn">Enable notifications</button>
+          <button class="btn" id="testSound">Test sound</button>
+        </div>
+        <p class="hint">Alarms ring while Quota is open in a tab, even in the background. On a phone, add it to the home screen and keep it open.</p>
+      </section>
     </div>
   </section>
 
   <!-- STATS -->
-  <section id="view-stats" class="view" aria-label="Stats">
-    <div class="card rank-card">
-      <div class="rank-big" id="rankBig">Aspirant</div>
-      <div class="bar"><i id="rankFill"></i></div>
-      <p class="muted small" id="rankNext"></p>
-      <p class="muted small">XP: 1 per minute studied, +120 for every day you hit the daily goal, +600 for every week you hit the quota.</p>
+  <section id="view-stats" class="view" aria-labelledby="statsH">
+    <div class="title-row"><div><h1 id="statsH">Stats</h1><p class="muted" id="rankLine"></p></div></div>
+    <div class="grid two">
+      <section class="panel" aria-labelledby="rankH">
+        <div class="panel-head"><h2 id="rankH">Rank</h2><span class="muted num" id="rankXp"></span></div>
+        <p class="kpi" id="rankBig">Aspirant</p>
+        <div class="meter"><div class="track"><i id="rankFill"></i></div><div class="ends small muted" id="rankEnds"></div></div>
+        <p class="muted small">1 XP per minute studied, +120 for each day the goal is hit, +600 for each quota week.</p>
+        <ol class="ladder" id="ladder"></ol>
+      </section>
+      <section class="panel" aria-labelledby="lifeH">
+        <div class="panel-head"><h2 id="lifeH">Lifetime</h2></div>
+        <dl class="facts" id="totals"></dl>
+        <div class="panel-head sub"><h2>Last 8 weeks</h2><span class="muted small" id="quotaLabel"></span></div>
+        <div class="weeks" id="weeks"></div>
+        <div class="panel-head sub"><h2>Subjects this week</h2></div>
+        <div class="weeks" id="subjects"></div>
+      </section>
     </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Lifetime</h2></div>
-      <div class="totals" id="totals"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Badges</h2><span class="pill" id="badgeCount">0</span></div>
-      <div class="badges" id="badges"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Last 8 weeks</h2></div>
-      <div class="weeks" id="weeks"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Subjects this week</h2></div>
-      <div class="subjects" id="subjects"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Rank ladder</h2></div>
-      <ol class="ladder" id="ladder"></ol>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Recent sessions</h2></div>
-      <ul class="sessions" id="recentSessions"></ul>
-    </div>
+    <section class="panel" aria-labelledby="badgeH">
+      <div class="panel-head"><h2 id="badgeH">Badges</h2><span class="muted num" id="badgeCount"></span></div>
+      <ul class="badges" id="badges"></ul>
+    </section>
+    <section class="panel" aria-labelledby="recentH">
+      <div class="panel-head"><h2 id="recentH">Recent entries</h2></div>
+      <ul class="entries" id="recentSessions"></ul>
+    </section>
   </section>
 
   <!-- SETTINGS -->
-  <section id="view-settings" class="view" aria-label="Settings">
-    <form class="card settings" id="settingsForm" onsubmit="return false">
-      <div class="card-head"><h2>Goals</h2></div>
+  <section id="view-settings" class="view" aria-labelledby="setH">
+    <div class="title-row"><div><h1 id="setH">Settings</h1><p class="muted">Every change saves on its own.</p></div></div>
+    <form class="panel settings" id="settingsForm" onsubmit="return false">
+      <div class="panel-head"><h2>Goals</h2></div>
       <label>Name <input type="text" data-set="name" maxlength="30"></label>
       <label>Daily goal (hours) <input type="number" data-set="dailyGoal" min="0.5" max="20" step="0.5"></label>
       <label>Weekly quota (hours) <input type="number" data-set="weeklyGoal" min="1" max="140" step="0.5"></label>
-      <label class="check"><input type="checkbox" data-set="linkWeekly"> Keep weekly quota = daily goal × 7</label>
+      <label class="check"><input type="checkbox" data-set="linkWeekly"> Keep weekly quota at daily goal × 7</label>
       <label>Week starts on
         <select data-set="weekStart" data-num="1">
           <option value="1">Monday</option>
@@ -223,19 +247,19 @@
           <option value="5">5 AM</option>
         </select>
       </label>
-      <p class="hint">Late-night study before this hour counts towards the previous day.</p>
+      <p class="hint">Study before this hour counts towards the previous day.</p>
 
-      <div class="card-head"><h2>Pomodoro</h2></div>
+      <div class="panel-head sub"><h2>Pomodoro</h2></div>
       <label>Focus (min) <input type="number" data-set="focusMin" min="5" max="180" step="5"></label>
       <label>Short break (min) <input type="number" data-set="shortMin" min="1" max="60" step="1"></label>
       <label>Long break (min) <input type="number" data-set="longMin" min="1" max="90" step="1"></label>
       <label>Long break after every <input type="number" data-set="longEvery" min="2" max="8" step="1"></label>
       <label class="check"><input type="checkbox" data-set="autoBreak"> Start breaks automatically</label>
-      <label class="check"><input type="checkbox" data-set="autoFocus"> Start next focus automatically</label>
+      <label class="check"><input type="checkbox" data-set="autoFocus"> Start the next focus automatically</label>
       <label>Alarm volume <input type="range" data-set="volume" min="0" max="1" step="0.05"></label>
 
-      <div class="card-head"><h2>Your data</h2></div>
-      <p class="hint">Everything is stored on this device only. Export a backup now and then, and use it to move to a new phone or laptop.</p>
+      <div class="panel-head sub"><h2>Your data</h2></div>
+      <p class="hint">Everything stays on this device. Export a backup now and then, and import it on a new phone or laptop.</p>
       <div class="row wrap">
         <button class="btn" type="button" id="exportBtn">Export backup</button>
         <label class="btn" for="importFile">Import backup</label>
@@ -246,34 +270,10 @@
   </section>
 </main>
 
-<nav class="tabs" aria-label="Sections">
-  <button data-tab="today" class="on">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Today</button>
-  <button data-tab="focus">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 13V9M9 3h6"/></svg>Focus</button>
-  <button data-tab="alarms">
-    <svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>Alarms</button>
-  <button data-tab="stats">
-    <svg viewBox="0 0 24 24"><path d="M5 20V12M12 20V5M19 20v-9"/></svg>Stats</button>
-  <button data-tab="settings">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Settings</button>
-</nav>
-
-<!-- Morning briefing -->
-<div class="overlay" id="briefing" hidden>
-  <div class="sheet briefing" role="dialog" aria-modal="true" aria-labelledby="bfHello">
-    <div class="bf-date" id="bfDate"></div>
-    <h2 id="bfHello">Good morning</h2>
-    <blockquote class="bf-quote"><p id="bfQuote"></p><cite id="bfAuthor"></cite></blockquote>
-    <div class="bf-report" id="bfReport"></div>
-    <button class="btn primary wide" id="bfGo">Let's go</button>
-  </div>
-</div>
-
 <!-- Ringing alarm -->
 <div class="overlay" id="ringing" hidden>
   <div class="sheet ring-sheet" role="alertdialog" aria-modal="true" aria-labelledby="ringTitle">
-    <div class="bell" aria-hidden="true">⏰</div>
+    <svg class="bell" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>
     <h2 id="ringTitle">Alarm</h2>
     <p id="ringBody"></p>
     <div class="controls">
@@ -285,6 +285,7 @@
 
 <div id="toasts" aria-live="polite"></div>
 
+<script src="charts.js"></script>
 <script src="quotes.js"></script>
 <script src="app.js"></script>
 </body>
